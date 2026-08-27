@@ -1,0 +1,10 @@
+{
+  "name": "run-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Run Map — mappa e PB delle gare",
+  "type": "module",
+  "scripts": {
+    "serve": "npx serve ."
+  }
+}

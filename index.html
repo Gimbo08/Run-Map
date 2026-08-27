@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Run Map — Garuti Erick</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🏃</span>
+    <div>
+      <h1>Run Map</h1>
+      <p class="athlete">GARUTI ERICK · <a href="https://www.irunning.it/atleta.php?id=375285#tab1" target="_blank" rel="noopener">scheda iRunning</a></p>
+    </div>
+  </div>
+  <div class="refresh-group">
+    <button id="refreshBtn" class="theme-btn refresh-btn" title="Ricarica le gare da iRunning">
+      <svg class="btn-logo" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10h-3a7 7 0 1 1-2.05-4.95L14 10h8V2l-2.93 2.93A9.96 9.96 0 0 0 12 2z"/></svg>
+    </button>
+  </div>
+  <button id="themeToggle" class="theme-btn" title="Cambia tema chiaro/scuro">🌙</button>
+</header>
+
+<main>
+  <section id="map" class="card map-card" aria-label="Mappa delle gare"></section>
+
+  <section class="card pb-panel">
+    <h2 class="pb-title">P.B. per distanza:</h2>
+    <div class="pb-grid" aria-label="Record personali">
+      <div class="pb-card" id="pb-5"><h2>5 km</h2><div class="pb-time">—</div><div class="pb-meta"></div></div>
+      <div class="pb-card" id="pb-10"><h2>10 km</h2><div class="pb-time">—</div><div class="pb-meta"></div></div>
+      <div class="pb-card" id="pb-21"><h2>21 km</h2><div class="pb-time">—</div><div class="pb-meta"></div></div>
+      <div class="pb-card" id="pb-42"><h2>42 km</h2><div class="pb-time">—</div><div class="pb-meta"></div></div>
+    </div>
+  </section>
+
+  <section class="card races-card manual-card" id="manualCard" hidden>
+    <h2>Aggiungi gara manuale <button type="button" id="closeManualBtn" class="manual-close" title="Chiudi" aria-label="Chiudi">&times;</button></h2>
+    <form id="manualForm" class="manual-form">
+      <div class="manual-row">
+        <div class="field"><label for="mName">Nome gara *</label><input id="mName" required placeholder="es. Gara del paese"></div>
+        <div class="field"><label for="mDate">Data *</label><input id="mDate" type="date" required></div>
+        <div class="field"><label for="mKm">Distanza (km) *</label><input id="mKm" type="number" min="0.5" step="0.1" required placeholder="es. 10"></div>
+        <div class="field"><label for="mTime">Tempo *</label><input id="mTime" required placeholder="00:45:30"></div>
+        <div class="field"><label for="mLoc">Località</label><input id="mLoc" placeholder="es. Reggio Emilia (RE)"></div>
+        <div class="field"><label for="mSpec">Specialità</label><select id="mSpec"><option>strada</option><option>trail</option><option>montagna</option><option>vertical</option><option>pista</option></select></div>
+      </div>
+      <div class="manual-row">
+        <div class="field grow"><label for="mNote">Note (opzionale)</label><input id="mNote" placeholder="note sulla gara…"></div>
+        <div class="field"><label for="mPhoto">Foto (opzionale)</label><input id="mPhoto" type="file" accept="image/*" multiple></div>
+      </div>
+      <button type="submit" class="km-save manual-add">+ Aggiungi gara</button>
+    </form>
+  </section>
+
+  <section class="card races-card">
+    <div class="races-header">
+      <h2>Tutte le gare <span id="raceCount" class="pill"></span></h2>
+      <button id="toggleManualBtn" class="km-save manual-add" type="button">+ Aggiungi gara</button>
+    </div>
+    <div id="raceList" class="race-list"></div>
+  </section>
+</main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card card">
+    <button class="close-btn" id="modalClose">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
