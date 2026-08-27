@@ -519,7 +519,11 @@ function addManualResult(base, date, time) {
 /* --- aggiunta manuale di una gara non presente sui portali --- */
 const MANUAL_KEY = "manualRaces";
 function loadManualRaces() {
-  // le gare inserite a mano vivono nel localStorage: sopravvivono ai ricaricamenti
+  // 1) gare manuali "di serie" incluse nella versione (seed statico)
+  (window.SEED_MANUAL_RACES || []).forEach(r => {
+    if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
+  });
+  // 2) gare inserite a mano nel browser (localStorage)
   store.get(MANUAL_KEY, []).forEach(r => {
     if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
   });
@@ -627,3 +631,54 @@ applyTheme(store.get("theme", "light"));
 renderPbCards();
 renderRaceList();
 drawMarkers();
+
+/* ===== Esporta / Importa gare manuali (localStorage -> file JSON) ===== */
+const exportBtn = document.getElementById("exportBtn");
+const importBtn = document.getElementById("importBtn");
+const importFile = document.getElementById("importFile");
+
+exportBtn.addEventListener("click", () => {
+  const manual = store.get(MANUAL_KEY, []);
+  const payload = { app: "run-map", type: "manual-races", exportedAt: new Date().toISOString(), races: manual };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "run-map-gare-manuali.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+importBtn.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", () => {
+  const f = importFile.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data) ? data : (Array.isArray(data.races) ? data.races : null);
+      if (!incoming) throw new Error("formato");
+      const existing = store.get(MANUAL_KEY, []);
+      // unisci evitando duplicati (stesso nome + stessa data)
+      const seen = new Set(existing.map(r => (r.name + "|" + r.date).toLowerCase()));
+      let added = 0;
+      for (const r of incoming) {
+        if (!r || !r.name || !r.date) continue;
+        const key = (r.name + "|" + r.date).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        existing.push(r);
+        added++;
+      }
+      store.set(MANUAL_KEY, existing);
+      renderPbCards();
+      renderRaceList();
+      alert(`Importate ${added} nuove gare (${incoming.length - added} già presenti).`);
+      refreshAfterManual();
+    } catch {
+      alert("File non valido: deve essere un JSON esportato da Run Map.");
+    }
+    importFile.value = "";
+  };
+  reader.readAsText(f);
+});

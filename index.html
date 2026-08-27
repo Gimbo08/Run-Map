@@ -60,6 +60,9 @@
     <div class="races-header">
       <h2>Tutte le gare <span id="raceCount" class="pill"></span></h2>
       <button id="toggleManualBtn" class="km-save manual-add" type="button">+ Aggiungi gara</button>
+      <button id="exportBtn" class="km-save manual-add" type="button" title="Salva le gare manuali in un file">⬇ Esporta</button>
+      <button id="importBtn" class="km-save manual-add" type="button" title="Carica le gare manuali da un file">⬆ Importa</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
     </div>
     <div id="raceList" class="race-list"></div>
   </section>
@@ -74,6 +77,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/data.js"></script>
+<script src="js/seed-manual-races.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
