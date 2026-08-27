@@ -1,6 +1,4 @@
-/* Gare manuali "di serie": incluse in ogni versione dell'app.
-   Per aggiornarle: usa il pulsante "Esporta" nell'app, poi sostituisci l'array qui sotto
-   con il contenuto del campo "races" del file esportato. */
+/* Gare manuali "di serie": incluse in ogni versione dell'app. */
 window.SEED_MANUAL_RACES = [
   {
     "date": "2026-05-26",
