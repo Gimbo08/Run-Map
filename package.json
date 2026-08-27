@@ -5,6 +5,7 @@
   "description": "Run Map — mappa e PB delle gare",
   "type": "module",
   "scripts": {
+    "start": "node scripts/server.mjs",
     "serve": "npx serve ."
   }
 }

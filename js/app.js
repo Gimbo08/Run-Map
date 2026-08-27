@@ -54,6 +54,46 @@ const store = {
 function raceKey(r) { return "race-" + raceId(r); }
 function getNotes(r) { return store.get(raceKey(r), { note: "", photos: [] }); }
 
+/* --- backend condiviso (scripts/server.mjs): sync gare manuali e note/foto ---
+   Tutti i salvataggi restano in localStorage (cache/offline) e vengono replicati
+   su data/db.json tramite l'API; all'avvio si scarica ciò che manca. */
+function pushManualToBackend() {
+  fetch("/api/manual-races", { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(store.get(MANUAL_KEY, [])) }).catch(() => {});
+}
+function pushNotesToBackend(id) {
+  const d = store.get("race-" + id, { note: "", photos: [] });
+  fetch("/api/notes/" + encodeURIComponent(id), { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(d) }).catch(() => {});
+}
+function deleteNotesOnBackend(id) {
+  fetch("/api/notes/" + encodeURIComponent(id), { method: "DELETE" }).catch(() => {});
+}
+async function syncFromBackend() {
+  try {
+    const races = await fetch("/api/manual-races", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+    if (Array.isArray(races)) {
+      const list = store.get(MANUAL_KEY, []);
+      races.forEach(r => {
+        if (!RACES.some(x => raceId(x) === raceId(r)) && !list.some(x => raceId(x) === raceId(r))) {
+          list.push(r); RACES.push(r);
+        }
+      });
+      store.set(MANUAL_KEY, list);
+    }
+    const notes = await fetch("/api/notes", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+    if (notes && typeof notes === "object") {
+      Object.entries(notes).forEach(([id, n]) => {
+        const cur = store.get("race-" + id, { note: "", photos: [] });
+        // il backend vince solo se ha più dati della copia locale
+        if ((n.photos || []).length >= (cur.photos || []).length && (n.note || "").length >= (cur.note || "").length)
+          store.set("race-" + id, n);
+      });
+    }
+    renderPbCards(); renderRaceList(); drawMarkers();
+  } catch { /* senza backend (file:// o server spento): si resta sui dati locali */ }
+}
+
 /* --- tema chiaro/scuro --- */
 const themeBtn = document.getElementById("themeToggle");
 function applyTheme(t) {
@@ -167,8 +207,9 @@ function renderRaceList() {
   [...RACES].sort((a, b) => b.date.localeCompare(a.date)).forEach(r => {
     const d = document.createElement("div");
     d.className = "race-row";
+    const _eff = effLoc(r);
     d.innerHTML = `<div class="race-info"><strong>${r.name}</strong>
-      <span class="muted">${fmtDate(r.date)} \u00B7 ${r.location || "—"} \u00B7 ${r.specialty}${r.source === "manuale" ? ' · <span class="src-badge">manuale</span>' : ""}${kmKnown(r) ? "" : ' \u00B7 <span class="km-missing">distanza da impostare</span>'}</span></div>
+      <span class="muted">${fmtDate(r.date)} \u00B7 ${_eff.location || "—"} \u00B7 ${r.specialty}${r.source === "manuale" ? ' · <span class="src-badge">manuale</span>' : ""}${kmKnown(r) ? "" : ' \u00B7 <span class="km-missing">distanza da impostare</span>'}</span></div>
       <div class="race-time">${r.time}${r.pb ? ' <span class="pb-badge">P.B.</span>' : ""}</div>
       <button class="race-del" title="Elimina gara dall'elenco" aria-label="Elimina gara">\u{1F5D1}</button>`;
     d.querySelector(".race-del").addEventListener("click", e => {
@@ -193,7 +234,9 @@ function deleteRace(r) {
   localStorage.removeItem("runmap:loc-" + id);
   if (r.source === "manuale") {
     store.set(MANUAL_KEY, store.get(MANUAL_KEY, []).filter(x => raceId(x) !== id));
+    pushManualToBackend();
   }
+  deleteNotesOnBackend(id);
   renderPbCards();
   renderRaceList();
   drawMarkers();
@@ -390,6 +433,7 @@ function openRaceModal(race) {
   });
   document.getElementById("noteField").addEventListener("input", e => {
     const d = getNotes(race); d.note = e.target.value; store.set(raceKey(race), d);
+    pushNotesToBackend(raceId(race));
   });
   document.getElementById("photoInput").addEventListener("change", e => {
     [...e.target.files].forEach(f => {
@@ -399,6 +443,7 @@ function openRaceModal(race) {
         d.photos.push(reader.result);
         if (d.photos.length > 12) d.photos.shift(); // limite memoria
         store.set(raceKey(race), d);
+        pushNotesToBackend(raceId(race));
         renderPhotos(race, d.photos);
       };
       reader.readAsDataURL(f);
@@ -416,7 +461,7 @@ function renderPhotos(race, photos) {
     w.className = "photo-item";
     w.innerHTML = `<img src="${src}" alt="foto gara"><button class="photo-del" title="Elimina">\u2715</button>`;
     w.querySelector(".photo-del").addEventListener("click", () => {
-      const d = getNotes(race); d.photos.splice(i, 1); store.set(raceKey(race), d); renderPhotos(race, d.photos);
+      const d = getNotes(race); d.photos.splice(i, 1); store.set(raceKey(race), d); pushNotesToBackend(raceId(race)); renderPhotos(race, d.photos);
     });
     grid.appendChild(w);
   });
@@ -536,6 +581,7 @@ function saveManualRace(race) {
   const list = store.get(MANUAL_KEY, []).filter(x => raceId(x) !== raceId(race));
   list.push(race);
   store.set(MANUAL_KEY, list);
+  pushManualToBackend();
 }
 function manualRaceId(name, date) { return "man-" + normId(name) + "-" + date; }
 function normId(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }
@@ -610,11 +656,11 @@ manualForm.addEventListener("submit", async e => {
     reader.onload = () => {
       d.photos.push(reader.result);
       store.set(raceKey(race), d);
-      if (--pending === 0) refreshAfterManual();
+      if (--pending === 0) { pushNotesToBackend(raceId(race)); refreshAfterManual(); }
     };
     reader.readAsDataURL(f);
   });
-  if (note) store.set(raceKey(race), d);
+  if (note) { store.set(raceKey(race), d); pushNotesToBackend(raceId(race)); }
 
   manualForm.reset();
   mLocPick = null;
@@ -635,4 +681,5 @@ applyTheme(store.get("theme", "light"));
 renderPbCards();
 renderRaceList();
 drawMarkers();
+syncFromBackend(); // se c'è il backend condiviso, scarica gare/note/foto e ri-renderizza
 
