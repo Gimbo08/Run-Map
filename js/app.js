@@ -316,6 +316,9 @@ function openRaceModal(race) {
     const v = parseFloat(document.getElementById("kmField").value.replace(",", "."));
     if (!v || v <= 0) return;
     store.set(kmKey(race), v);
+    // salva la distanza anche sulla gara, così viene inclusa nell'export
+    // e nelle gare manuali di serie (non si perde aggiornando il seed)
+    if (race.source === "manuale") { race.km = v; saveManualRace(race); }
     modal.hidden = true;
     renderPbCards();
     renderRaceList();
@@ -519,12 +522,13 @@ function addManualResult(base, date, time) {
 /* --- aggiunta manuale di una gara non presente sui portali --- */
 const MANUAL_KEY = "manualRaces";
 function loadManualRaces() {
-  // 1) gare manuali "di serie" incluse nella versione (seed statico)
-  (window.SEED_MANUAL_RACES || []).forEach(r => {
+  // 1) gare inserite a mano nel browser (localStorage): priorità sulle versioni nel seed,
+  //    così le modifiche fatte (città, km, ecc.) non vengono perse aggiornando il seed su GitHub
+  store.get(MANUAL_KEY, []).forEach(r => {
     if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
   });
-  // 2) gare inserite a mano nel browser (localStorage)
-  store.get(MANUAL_KEY, []).forEach(r => {
+  // 2) gare manuali "di serie" incluse nella versione (seed statico), solo se non già presenti
+  (window.SEED_MANUAL_RACES || []).forEach(r => {
     if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
   });
 }
