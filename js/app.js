@@ -54,44 +54,45 @@ const store = {
 function raceKey(r) { return "race-" + raceId(r); }
 function getNotes(r) { return store.get(raceKey(r), { note: "", photos: [] }); }
 
-/* --- backend condiviso (scripts/server.mjs): sync gare manuali e note/foto ---
+/* --- sincronizzazione cloud via Google Apps Script ---
    Tutti i salvataggi restano in localStorage (cache/offline) e vengono replicati
-   su data/db.json tramite l'API; all'avvio si scarica ciò che manca. */
+   sul cloud nel "spazio" dell'account Google con cui si è effettuato il login.
+   Account diversi vedono dati completamente separati. */
+function cloudPush(key, value) {
+  if (window.cloudSave) window.cloudSave(key, value).catch(() => {});
+}
 function pushManualToBackend() {
-  fetch("/api/manual-races", { method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(store.get(MANUAL_KEY, [])) }).catch(() => {});
+  cloudPush(MANUAL_KEY, store.get(MANUAL_KEY, []));
 }
 function pushNotesToBackend(id) {
-  const d = store.get("race-" + id, { note: "", photos: [] });
-  fetch("/api/notes/" + encodeURIComponent(id), { method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(d) }).catch(() => {});
+  cloudPush("race-" + id, store.get("race-" + id, { note: "", photos: [] }));
 }
 function deleteNotesOnBackend(id) {
-  fetch("/api/notes/" + encodeURIComponent(id), { method: "DELETE" }).catch(() => {});
+  cloudPush("race-" + id, null);
 }
 async function syncFromBackend() {
   try {
-    const races = await fetch("/api/manual-races", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
-    if (Array.isArray(races)) {
+    if (!window.cloudLoad) return;
+    const data = await window.cloudLoad();
+    if (!data || typeof data !== "object") return;
+    if (Array.isArray(data[MANUAL_KEY])) {
       const list = store.get(MANUAL_KEY, []);
-      races.forEach(r => {
+      data[MANUAL_KEY].forEach(r => {
         if (!RACES.some(x => raceId(x) === raceId(r)) && !list.some(x => raceId(x) === raceId(r))) {
           list.push(r); RACES.push(r);
         }
       });
       store.set(MANUAL_KEY, list);
     }
-    const notes = await fetch("/api/notes", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
-    if (notes && typeof notes === "object") {
-      Object.entries(notes).forEach(([id, n]) => {
-        const cur = store.get("race-" + id, { note: "", photos: [] });
-        // il backend vince solo se ha più dati della copia locale
-        if ((n.photos || []).length >= (cur.photos || []).length && (n.note || "").length >= (cur.note || "").length)
-          store.set("race-" + id, n);
-      });
-    }
+    Object.entries(data).forEach(([key, v]) => {
+      if (!key.startsWith("race-") || !v || typeof v !== "object") return;
+      const cur = store.get(key, { note: "", photos: [] });
+      // il cloud vince solo se ha più dati della copia locale
+      if ((v.photos || []).length >= (cur.photos || []).length && (v.note || "").length >= (cur.note || "").length)
+        store.set(key, v);
+    });
     renderPbCards(); renderRaceList(); drawMarkers();
-  } catch { /* senza backend (file:// o server spento): si resta sui dati locali */ }
+  } catch { /* offline o non loggati: si resta sui dati locali */ }
 }
 
 /* --- tema chiaro/scuro --- */
