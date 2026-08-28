@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Run Map — Accesso</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { text-align: center; padding: 2.5rem 3rem; max-width: 420px; }
+  .login-card .logo { font-size: 3rem; }
+  .login-card h1 { margin: .5rem 0 0; }
+  .login-card p.muted { margin: .75rem 0 1.75rem; }
+  #authBox { display: flex; justify-content: center; min-height: 44px; }
+</style>
+</head>
+<body>
+  <div class="card login-card">
+    <span class="logo">🏃</span>
+    <h1>Run Map</h1>
+    <p class="muted">Accedi con il tuo account Google per sincronizzare le gare sul cloud.</p>
+    <div id="authBox" class="auth-box"></div>
+    <p id="loginMsg" class="muted" hidden>Accesso riuscito, caricamento…</p>
+  </div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="js/cloud-config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+// appena il login va a buon fine → vai alla home
+const timer = setInterval(() => {
+  if (auth.user && auth.idToken) {
+    clearInterval(timer);
+    document.getElementById("loginMsg").hidden = false;
+    setTimeout(() => location.replace("index.html"), 400);
+  }
+}, 250);
+</script>
+</body>
+</html>

@@ -73,6 +73,17 @@
   </div>
 </div>
 
+<script>
+/* accesso obbligatorio: senza un token Google valido → pagina di login */
+(function () {
+  try {
+    const t = sessionStorage.getItem("runmap:idToken");
+    if (!t) throw 0;
+    const p = JSON.parse(decodeURIComponent(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")));
+    if (!p.exp || p.exp < Date.now() / 1000) throw 0; // scaduto (max 1 h)
+  } catch { location.replace("login.html"); }
+})();
+</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="js/cloud-config.js"></script>
