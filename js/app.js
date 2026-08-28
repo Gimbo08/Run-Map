@@ -312,7 +312,7 @@ function openRaceModal(race) {
       \u00B7 ${resultsLink(race)}</p>
     <div class="km-box">
       <label for="kmField">${known
-        ? `Distanza: <strong>${distanzaAttuale} km</strong>${manualKm != null ? " (inserita manualmente: " + manualKm + " km)" : " (dalla nome della gara)"} \u2014 modificabile`
+        ? `Distanza: <strong>${distanzaAttuale} km</strong>${manualKm != null ? " (inserita manualmente: " + manualKm + " km)" : " (dal nome della gara)"} \u2014 modificabile`
         : "Distanza non rilevata dal nome: inseriscila manualmente (km)"}</label>
       <div class="km-row">
         <input type="number" id="kmField" min="0.5" max="200" step="0.1" value="${manualKm != null ? manualKm : (distanzaAttuale != null ? distanzaAttuale : "")}" placeholder="es. 10">
@@ -370,6 +370,12 @@ function openRaceModal(race) {
   const kmReset = document.getElementById("kmReset");
   if (kmReset) kmReset.addEventListener("click", () => {
     localStorage.removeItem("runmap:" + kmKey(race));
+    // se è una gara manuale, azzera anche la distanza salvata sulla gara
+    // (altrimenti il "ripristina dal nome" non sarebbe efficace)
+    if (race.source === "manuale") {
+      race.km = undefined;
+      saveManualRace(race);
+    }
     modal.hidden = true;
     renderPbCards();
     renderRaceList();

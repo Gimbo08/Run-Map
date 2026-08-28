@@ -1,4 +1,4 @@
-// Test rapido modal distanza: STRACHIVIOL (10 km dal nome)
+// Test rapido modal distanza: apre il modal della prima gara in lista
 // Uso: node test.mjs  (parte un server statico, apre il browser, chiude tutto)
 import { chromium } from "playwright";
 import { createServer } from "http";
@@ -19,18 +19,35 @@ const port = server.address().port;
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
+page.on('console', m => { if (m.type() === 'error') console.log('PAGE ERROR:', m.text()); });
+page.on('pageerror', e => console.log('PAGE EXCEPTION:', e.message));
+// index.html richiede un token Google valido in sessionStorage (exp futuro)
+// → si inietta un JWT finto con scadenza lontana per superare il gate di login
+const fakeToken = [
+  Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"),
+  Buffer.from(JSON.stringify({ email: "test@test.it", name: "Test", exp: 4102444800 })).toString("base64url"),
+  "firma-finta"
+].join(".");
+await page.addInitScript(t => sessionStorage.setItem("runmap:idToken", t), fakeToken);
 await page.goto(`http://localhost:${port}/index.html`);
 await page.waitForSelector(".race-row");
 
 export default async function run(page, ui) {
   const out = {};
-  // apri modal STRACHIVIOL (10 km dal nome)
-  await page.evaluate(() => {
-    [...document.querySelectorAll('.race-row')].forEach(d => {
-      if (d.textContent.includes('STRACHIVIOL')) d.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+  // apri modal della PRIMA gara reale in lista
+  out.rowName = await page.evaluate(() => {
+    const r = document.querySelector('.race-row');
+    if (!r) return null;
+    r.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return r.textContent.trim().slice(0, 60);
   });
   await page.waitForTimeout(300);
+  out.modalState = await page.evaluate(() => ({
+    hidden: document.getElementById('modal').hidden,
+    bodyLen: document.getElementById('modalBody')?.innerHTML.length,
+    bodySnippet: document.getElementById('modalBody')?.innerHTML.slice(0, 300)
+  }));
+  console.log('MODAL STATE:', JSON.stringify(out.modalState));
   out.initial = await page.evaluate(() => ({
     label: document.querySelector('#modalBody .km-box label')?.textContent.trim(),
     value: document.getElementById('kmField')?.value,
@@ -48,8 +65,8 @@ export default async function run(page, ui) {
     value: document.getElementById('kmField')?.value,
     hasReset: !!document.getElementById('kmReset')
   }));
-  // 12 km rientra nella fascia [9.5, 20) delle card "10 km", ma 00:52:52 non batte il PB 00:47:30
-  out.pb10 = await page.evaluate(() => document.querySelector('#pb-10 .pb-time')?.textContent);
+  // log del PB della card 10 km (se esiste) per visibilità sul riposizionamento
+  out.pb10 = await page.evaluate(() => document.querySelector('#pb-10 .pb-time')?.textContent ?? null);
   // ripristina dal nome
   await page.evaluate(() => document.getElementById('kmReset')?.click());
   await page.waitForTimeout(300);
