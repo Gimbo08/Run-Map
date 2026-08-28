@@ -675,7 +675,6 @@ function refreshAfterManual() {
 }
 
 /* --- init --- */
-window.RACES = RACES;
 loadManualRaces();
 applyTheme(store.get("theme", "light"));
 renderPbCards();
