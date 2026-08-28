@@ -10,5 +10,5 @@
  *    incolla qui l'URL del deployment (/exec). L'accesso ai dati è protetto
  *    dal login Google: ogni account vede e modifica solo i propri dati.
  */
-const GOOGLE_CLIENT_ID = "erikgaruti@gmail.com.apps.googleusercontent.com";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/XXXXXXXX/exec";
+const GOOGLE_CLIENT_ID = "1032131529172-r0nv5sfbua09ihd3lagaj2mkoklgdsl7.apps.googleusercontent.com";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWrzkiC_gwgThxwtO84DXPhy2A8Y6NbrHLUY7VN6pfNTYKbfiVPRrnOwQ-JunrNvFc/exec";

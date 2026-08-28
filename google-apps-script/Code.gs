@@ -30,7 +30,7 @@
 
 const DB_FILE_NAME = "runmap-db.json";
 
-const DEFAULT_CLIENT_ID = "erikgaruti@gmail.com";
+const DEFAULT_CLIENT_ID = "1032131529172-r0nv5sfbua09ihd3lagaj2mkoklgdsl7.apps.googleusercontent.com";
 
 function clientId_() {
   const props = PropertiesService.getScriptProperties();
