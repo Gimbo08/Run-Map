@@ -55,9 +55,9 @@ function raceKey(r) { return "race-" + raceId(r); }
 function getNotes(r) { return store.get(raceKey(r), { note: "", photos: [] }); }
 
 /* --- sincronizzazione cloud via Google Apps Script ---
-   Tutti i salvataggi restano in localStorage (cache/offline) e vengono replicati
-   sul cloud nel "spazio" dell'account Google con cui si è effettuato il login.
-   Account diversi vedono dati completamente separati. */
+   Le gare da iRunning vengono scaricate facendo lo scraping lato server
+   (Google Apps Script) e salvate SOLO sul cloud, nello spazio dell'account
+   Google con cui si è effettuato il login. Nessuna gara in locale. */
 function cloudPush(key, value) {
   if (window.cloudSave) window.cloudSave(key, value).catch(() => {});
 }
@@ -72,13 +72,24 @@ function pushNotesToBackend(id) {
 function deleteNotesOnBackend(id) {
   cloudPush("race-" + id, null);
 }
+/* Sincronizzazione all'apertura (e al click su refresh):
+   1) scraping iRunning lato server + merge incrementale sul cloud (solo nuove);
+   2) lettura dal cloud di gare manuali e note/foto. */
 async function syncFromBackend() {
   try {
+    if (window.cloudSyncIrunning) {
+      const irun = await window.cloudSyncIrunning();
+      if (irun && Array.isArray(irun.races)) {
+        // ricostruisce l'elenco: gare iRunning aggiornate + manuali già presenti
+        const manual = RACES.filter(x => x.source === "manuale");
+        RACES = [...manual, ...irun.races];
+      }
+    }
     if (!window.cloudLoad) return;
     const data = await window.cloudLoad();
     if (!data || typeof data !== "object") return;
     if (Array.isArray(data[MANUAL_KEY])) {
-      // le gare manuali arrivano solo dal cloud: nessuna scrittura locale
+      // gare manuali dal cloud: nessuna scrittura locale
       data[MANUAL_KEY].forEach(r => {
         if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
       });
@@ -91,7 +102,7 @@ async function syncFromBackend() {
         store.set(key, v);
     });
     renderPbCards(); renderRaceList(); drawMarkers();
-  } catch { /* offline o non loggati: si resta sui dati locali */ }
+  } catch { /* offline o non loggati: si resta sui dati correnti */ }
 }
 
 /* --- tema chiaro/scuro --- */
@@ -241,27 +252,19 @@ function deleteRace(r) {
   drawMarkers();
 }
 
-/* --- refresh gare: refetch data.js --- */
+/* --- refresh gare: sincronizza da iRunning (scraping sul cloud) --- */
 async function refreshRaces(btn) {
   btn.classList.add("spinning");
   let added = 0;
+  const before = new Set(RACES.map(raceId));
   try {
-    const src = await fetch("js/data.js?ts=" + Date.now(), { cache: "no-store" }).then(r => r.text());
-    const fresh = new Function(src + "; return RACES;")();
-    if (Array.isArray(fresh)) {
-      // merge incrementale: aggiunge SOLO le gare nuove, non ricarica le esistenti
-      // (le distanze inserite manualmente restano al loro posto)
-      const have = new Set(RACES.map(raceId));
-      fresh.forEach(r => { if (!have.has(raceId(r))) { RACES.push(r); added++; } });
-    }
+    await syncFromBackend();
+    added = RACES.filter(r => !before.has(raceId(r))).length;
   } catch (e) {
     /* aperto via file://: il fetch è bloccato da CORS, si tengono i dati correnti. Servi la cartella via HTTP (`npm start`) per il refresh dinamico. */
     console.error(e);
   }
   if (added) {
-    renderPbCards();
-    renderRaceList();
-    drawMarkers();
     btn.title = added + " nuova" + (added === 1 ? " gara" : " gare") + " aggiunta" + (added === 1 ? "" : "e");
   }
   setTimeout(() => btn.classList.remove("spinning"), 600);

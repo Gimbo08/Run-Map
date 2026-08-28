@@ -31,3 +31,26 @@ window.cloudSave = async function (key, value) {
   if (value === null) await cloudPost({ key, replace: true, data: {} }); // cancellazione
   else await cloudPost({ key, value });
 };
+
+/* Scraping gare da iRunning eseguito SUL SERVER (Google Apps Script),
+ * perché dal browser il CORS di irunning.it bloccherebbe il fetch.
+ * Il server scarica la scheda atleta, estrae le gare, le salva sul cloud
+ * (solo quelle nuove, per irunId) e restituisce { ok, added, races }. */
+window.cloudSyncIrunning = async function () {
+  if (!authConfigured()) return { ok: false, error: "cloud non configurato" };
+  if (!auth.idToken) {
+    promptGoogleLogin();
+    if (!auth.idToken) return { ok: false, error: "non autenticato" };
+  }
+  try {
+    return await cloudPost({ action: "sync-irunning" });
+  } catch (e) {
+    // token scaduto (max 1 h): ritenta dopo un nuovo login silenzioso
+    if (String(e.message).startsWith("auth:") && auth.ready) {
+      logout();
+      google.accounts.id.prompt();
+      if (auth.idToken) return await cloudPost({ action: "sync-irunning" });
+    }
+    return { ok: false, error: String(e.message || e) };
+  }
+};

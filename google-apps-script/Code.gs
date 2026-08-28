@@ -29,8 +29,10 @@
  */
 
 const DB_FILE_NAME = "runmap-db.json";
+const IRUNNING_ATLETA_URL = "https://www.irunning.it/atleta.php?id=";
+const IRUNNING_ATLETA_ID = "375285"; // atleta Garuti Erick
 
-const DEFAULT_CLIENT_ID = "1032131529172-r0nv5sfbua09ihd3lagaj2mkoklgdsl7.apps.googleusercontent.com";
+const DEFAULT_CLIENT_ID = "761557978615-vglbpp1rhldvmpu895t4d5vasfhr5bd5.apps.googleusercontent.com";
 
 function clientId_() {
   const props = PropertiesService.getScriptProperties();
@@ -88,6 +90,14 @@ function doPost(e) {
     const db = readDb_();
     const mine = db[user.email] || {}; // spazio dati riservato a questo account
 
+    if (body.action === "sync-irunning") {
+      // scraping iRunning + merge incrementale delle gare (solo nuove)
+      const r = syncIrunning_(mine);
+      db[user.email] = mine;
+      dbFile_().setContent(JSON.stringify(db));
+      return json_(r);
+    }
+
     if (body.replace === true) {
       // sostituzione completa dei SOLI dati di questo account
       const fresh = body.data && typeof body.data === "object" ? body.data : {};
@@ -109,6 +119,65 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ===== Sincronizzazione gare da iRunning (scraping lato server) =====
+ * Scarica la scheda atleta, estrae le gare dalla tabella (tab "scheda"),
+ * e le salva SOLO sul cloud (chiave "irunningRaces"), aggiungendo solo
+ * le gare non ancora presenti (per irunId): le esistenti non vengono toccate.
+ * Restituisce { ok, added, races } con l'elenco aggiornato. */
+function syncIrunning_(mine) {
+  try {
+    const url = IRUNNING_ATLETA_URL + IRUNNING_ATLETA_ID;
+    const res = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      headers: { "Accept-Language": "it-IT,it;q=0.9", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
+    });
+    const html = res.getResponseCode() === 200 ? res.getContentText() : "";
+    const scraped = scrapeIrunningRaces_(html);
+    const existing = Array.isArray(mine.irunningRaces) ? mine.irunningRaces : [];
+    const have = new Set(existing.map(r => r.irunId));
+    let added = 0;
+    scraped.forEach(r => {
+      if (!r.irunId || have.has(String(r.irunId))) return;
+      have.add(String(r.irunId));
+      existing.push(r);
+      added++;
+    });
+    if (added) mine.irunningRaces = existing;
+    return { ok: true, added: added, races: existing };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+/* Estrae le righe della tabella risultati della scheda atleta iRunning.
+ * Struttura attesa: <tr id="exp_<id>"> … <td>nome</td> <td>specialità</td>
+ * <td>ris.</td> <td>età</td> <td>località</td> <td>data gg/mm/aaaa</td> */
+function scrapeIrunningRaces_(html) {
+  const out = [];
+  if (!html) return out;
+  const rowRe = /<tr id="exp_(\d+)">([\s\S]*?)<\/tr>/gi;
+  let m;
+  while ((m = rowRe.exec(html))) {
+    const irunId = m[1];
+    const cells = [];
+    const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let c;
+    while ((c = cellRe.exec(m[2]))) {
+      cells.push(c[1].replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").trim());
+    }
+    if (cells.length < 7) continue;
+    const name = cells[1];
+    const specialty = cells[2];
+    const time = cells[3].replace(/\./g, ":");
+    const location = cells[5];
+    const d = cells[6].split("/");
+    const date = d.length === 3 ? d[2] + "-" + d[1] + "-" + d[0] : cells[6];
+    if (!name || !time) continue;
+    out.push({ irunId: irunId, name: name, specialty: specialty, time: time, location: location, date: date });
+  }
+  return out;
 }
 
 function json_(obj) {
