@@ -61,8 +61,10 @@ function getNotes(r) { return store.get(raceKey(r), { note: "", photos: [] }); }
 function cloudPush(key, value) {
   if (window.cloudSave) window.cloudSave(key, value).catch(() => {});
 }
-function pushManualToBackend() {
-  cloudPush(MANUAL_KEY, store.get(MANUAL_KEY, []));
+// salvataggio di una gara manuale: SOLO push sul cloud, nessuna scrittura locale
+function saveManualRace(race) {
+  if (!RACES.some(x => raceId(x) === raceId(race))) RACES.push(race);
+  pushManualToBackend();
 }
 function pushNotesToBackend(id) {
   cloudPush("race-" + id, store.get("race-" + id, { note: "", photos: [] }));
@@ -76,13 +78,10 @@ async function syncFromBackend() {
     const data = await window.cloudLoad();
     if (!data || typeof data !== "object") return;
     if (Array.isArray(data[MANUAL_KEY])) {
-      const list = store.get(MANUAL_KEY, []);
+      // le gare manuali arrivano solo dal cloud: nessuna scrittura locale
       data[MANUAL_KEY].forEach(r => {
-        if (!RACES.some(x => raceId(x) === raceId(r)) && !list.some(x => raceId(x) === raceId(r))) {
-          list.push(r); RACES.push(r);
-        }
+        if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
       });
-      store.set(MANUAL_KEY, list);
     }
     Object.entries(data).forEach(([key, v]) => {
       if (!key.startsWith("race-") || !v || typeof v !== "object") return;
@@ -234,8 +233,7 @@ function deleteRace(r) {
   localStorage.removeItem("runmap:" + raceKey(r));
   localStorage.removeItem("runmap:loc-" + id);
   if (r.source === "manuale") {
-    store.set(MANUAL_KEY, store.get(MANUAL_KEY, []).filter(x => raceId(x) !== id));
-    pushManualToBackend();
+    pushManualToBackend();   // lista aggiornata (senza la gara) pushata sul cloud
   }
   deleteNotesOnBackend(id);
   renderPbCards();
@@ -565,24 +563,19 @@ function addManualResult(base, date, time) {
   return race;
 }
 
-/* --- aggiunta manuale di una gara non presente sui portali --- */
+/* --- aggiunta manuale di una gara non presente sui portali ---
+   Le gare manuali NON vengono salvate in locale: vivono solo in memoria
+   e vengono immediate pushate sul cloud (syncFromBackend le scarica al login). */
 const MANUAL_KEY = "manualRaces";
 function loadManualRaces() {
-  // 1) gare inserite a mano nel browser (localStorage): priorità sulle versioni nel seed,
-  //    così le modifiche fatte (città, km, ecc.) non vengono perse aggiornando il seed su GitHub
-  store.get(MANUAL_KEY, []).forEach(r => {
-    if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
-  });
-  // 2) gare manuali "di serie" incluse nella versione (seed statico), solo se non già presenti
+  // gare manuali "di serie" incluse nella versione (seed statico), solo se non già presenti
   (window.SEED_MANUAL_RACES || []).forEach(r => {
     if (!RACES.some(x => raceId(x) === raceId(r))) RACES.push(r);
   });
 }
-function saveManualRace(race) {
-  const list = store.get(MANUAL_KEY, []).filter(x => raceId(x) !== raceId(race));
-  list.push(race);
-  store.set(MANUAL_KEY, list);
-  pushManualToBackend();
+function pushManualToBackend() {
+  // elenco gare manuali ricostruito dalle gare in memoria e inviato al cloud
+  cloudPush(MANUAL_KEY, RACES.filter(r => r.source === "manuale"));
 }
 function manualRaceId(name, date) { return "man-" + normId(name) + "-" + date; }
 function normId(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }

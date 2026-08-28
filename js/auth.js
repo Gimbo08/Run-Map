@@ -68,9 +68,7 @@ function renderAuthUi() {
   box.hidden = false;
   if (auth.user) {
     box.innerHTML =
-      `<img class="auth-avatar" src="${auth.user.picture}" alt="" referrerpolicy="no-referrer">
-       <span class="auth-name" title="${auth.user.email}">${auth.user.name}</span>
-       <button id="logoutBtn" class="theme-btn" title="Esci">⎋</button>`;
+      `<button id="logoutBtn" class="logout-btn" title="Esci">Logout</button>`;
     document.getElementById("logoutBtn").addEventListener("click", logout);
   } else if (authConfigured()) {
     box.innerHTML = `<div id="googleBtn"></div>`;
